@@ -1,0 +1,469 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8x]{inputenc}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{multirow}
+
+%\allowdisplaybreaks
+
+\title{Encoding.}
+\date{}
+
+\begin{document}
+	\maketitle
+	
+	We demonstrate the principles of how our invariant selection method work by giving a corresponding encoding for a simple imperative language IMP.
+	
+	\section{IMP structure.}	
+    We denote $(x_1,..., x_m)$, $(y_1,..., y_n)$ vectors of variable names and $(e_1,...,e_k)$ vector of expressions.
+    The language structure is as follows.
+    \\
+    
+    Procedures:
+   
+    $proc:=$ 
+    $procedure$ $m(x_1,...,x_m)$ 
+    $returns(y_1,...,y_n)\{s\}$
+    \\
+    
+    Statements:
+    
+    $s:=$ $skip$ $|$ $x:=e$ $|$ \\ 
+    \- \hspace{1.2cm}
+    $(x_1,...,x_m):=call$ $m(e_1,...,e_k)$ $|$ \\ 
+    \- \hspace{1.2cm}
+    $s;s$ $|$ $if(b)$ $then$ $s$ $else$ $s$ $|$
+    $while(e)$ $do\{s\}$ $|$ \\
+    \- \hspace{1.2cm}   
+    $assume$ $e$ $|$ $assert$ $e$ $|$ $x:=havoc$
+	\\
+	
+	Expressions:
+		
+	For $c \in \mathbb{Z}$ (or $c \in \mathbb{R}$), 
+	$\oplus=\{+, -,* , /, \%, ==>, <==, <==>, \lor, \land, \lnot\}$
+	
+	$e:=$ $c$ $|$ $x$ $|$ $e \oplus e$ 	
+	
+	\section{Encoding.}
+	Let $I$ be the candidate invariant set. \\ 
+	Let $k := |I|$. \\
+	Let $I'$ be the ordered set $I$,
+	i.e. $I' = (inv_1,...,inv_k)$ such that
+	$\forall inv \in I'.inv \in I$ and
+	$\forall inv \in I.inv \in I'$.
+	\\
+	
+	$[[\bullet]]_I$ denotes the transformation function, which translates its inputs to the target encoding taking into account the candidate invariant set. 
+	
+	$[[\bullet]]_{I\_L}(targets)$ denotes the transformation function, which translates its inputs to the target encoding inside a loop taking into account the candidate invariant set. It takes a set of target variable names as its argument.
+	
+	The difference between 
+	$[[\bullet]]_I$ and $[[\bullet]]_{I\_L}(targets)$ is that the latter does not duplicate the statements. 
+	I.e. if some loop target variables are used in a statement, $[[\bullet]]_{I\_L}(targets)$ replaces this variable names with corresponding duplicate variable names, whereas $[[\bullet]]_I$ retains the original statement and adds another one with replaced variable names. 
+	
+	In case of nested loop statements
+	$[[\bullet]]_{I\_L}(targets)$ is also supposed to provide a
+	differentiation between loops of different levels with the help of the unique loop identifier, passed as an argument.
+	\\
+	
+	Let $proc$ be the method under transformation.
+	\\
+	
+	Let $loop$ $:=$ $while(e)$ $do\{s\}$.
+	\\
+	
+	Let $get\_id(loop)$ be the function, which returns the unique identifier of the $loop$, given as an argument.
+	
+	Let $get\_nested\_id(outer\_loop)$ be the function, which returns the set of identifiers ot the loops inside the $outer\_loop$.
+	
+	We use $var\_name\_id$, where $id$ should be replaced by an actual loop identifier for the variable names, which depends on the loop they are used in.  
+	\\
+	
+	Let $T(loop)$ be the function, which gives a set of names of all targets of a given loop. 
+	
+	Let $locals := \cup_{loop \in proc} T(loop)$.
+	
+	Let $vars := \{x_1, x_2,...\}$, 
+	where $x_1, x_2,...$ are variable names.
+	
+	Let $fresh(vars)$ denote that variable names $x_1, x_2,...$ are fresh, i.e. do not occur in the procedure under transformation.
+	
+	Let $M(vars) := vars'$ be a bijective function, 
+	such that $fresh(vars')$ holds. 
+	
+	Let $locals' := M(locals)$.
+	
+	Let $\odot^n_{i=1}s_i$ be the sequential composition of $n$ statements $s_1,...,s_n$.
+	\\
+	
+	Let $xs = (x_1,...,x_m)$ be the vector of parameter names, $ys = (y_1,...,y_n)$ be the vector of return variable names.
+	\\
+	
+	Let $xs\_s = \{x_1,...,x_m\}$ and $ys\_s = \{y_1,...,y_n\}$.
+	\\
+	
+	$e[set_1 / set_2]$ means we replace the variable names in $set_1$ with variable names in $set_2$ in expression $e$.
+	\\
+	
+	We further make the following assumptions.
+	
+	Input variables are immutable.
+	
+	\begin{equation*}
+	\begin{multlined}
+		call \text{ m} (e_1,...,e_n) \equiv \\
+			assume \text{ } [preconditions] \\
+			\text{[method body]} \\
+			assume \text{ } [postconditions]
+	\end{multlined}
+	\end{equation*}
+	
+	We assume that expressions cannot change the program state. I.e. $x := 1$, for example, is not an expression.
+	\\
+	
+	Together with our interpretation of the $call$ statement, this implies, that there is no need to transform the $call$ statement.
+	\\
+	
+	The translation looks as follows.
+	
+	\subsection{Procedure.}
+	
+	Since we define our encoding on the granularity of statements, i.e. procedure cannot be inside a loop, 
+	only $[[\bullet]]_I$ is defined for the procedure.
+	
+	\begin{equation*}
+	\begin{multlined}
+		[[procedure \text{ } m(xs) \text{ } 
+		returns(ys)\{s\}]]_{I}
+		= \\
+		procedure \text{ } m(xs) 
+		returns(ys)
+		\{
+		\odot_{x' \in locals'} x' := havoc \text{ ; }
+		[[s]]_{I}
+		\}
+	\end{multlined}
+	\end{equation*}
+	\\
+	
+	Same names for duplicated target variables are used through the whole procedure, so we declare them right at the beginning using $x' := havoc$ statement.
+		
+	\subsection{Skip.}
+	
+	\begin{equation*}
+		[[skip]]_{I} = skip 
+	\end{equation*}
+
+	\begin{equation*}
+	[[skip]]_{I\_L}(targets) = skip 
+	\end{equation*}
+		
+	Since $skip$ statement does not affect the program state,
+	our transformation functions do nothing in this case.
+	
+	\subsection{Sequential composition.}
+	
+	\begin{equation*}
+	[[s;s]]_{I} = [[s]]_{I} \text{ ; } [[s]]_{I}
+	\end{equation*}
+
+	\begin{equation*}
+	[[s;s]]_{I\_L}(targets) = 
+	[[s]]_{I\_L}(targets) 
+	\text{ ; } [[s]]_{I\_L}(targets)
+	\end{equation*}
+		
+	\subsection{If.}
+	
+	\begin{equation*}
+	[[if(e) \text{ } 
+	then \text{ } s  \text{ } 
+	else \text{ } s]]_{I}
+	=
+	if(e) \text{ } 
+	then \text{ } [[s]]_I \text{ } 
+	else \text{ } [[s]]_I
+	\end{equation*}
+	
+	\begin{equation*}
+	\begin{multlined}
+	[[if(e) \text{ } 
+	then \text{ } s  \text{ } 
+	else \text{ } s]]_{I\_L}(targets)
+	= \\
+	if(e[vars / targets]) \text{ } 
+	then \text{ } [[s]]_{I\_L}(targets) \text{ } 
+	else \text{ } [[s]]_{I\_L}(targets) \text{ ,} \\
+	\text{for $vars$ such that } targets = M[vars]
+	\end{multlined}
+	\end{equation*}
+	
+	\subsection{Assume.}
+	
+	\begin{equation*}
+		[[assume \text{ } e]]_{I} = assume \text{ } e 
+	\end{equation*}
+	
+	\begin{equation*}
+	\begin{multlined}
+		[[assume \text{ } e]]_{I\_L}(targets) = 
+		assume \text{ } e[vars / targets] \text{ ,} \\
+		\text{for $vars$ such that } targets = M[vars]
+	\end{multlined}
+	\end{equation*}
+	
+	\subsection{Assert.}
+	
+	\begin{equation*}
+		[[assert \text{ } e]]_I = assert \text{ } e 
+	\end{equation*}
+
+	\begin{equation*}
+		[[assert \text{ } e]]_{I\_L}(targets) = skip
+	\end{equation*}
+
+	In case of $[[\bullet]]_{I\_L}(targets)$ function we cannot transform the statement into assertion, since it may rely on invariants, yet have to be proven. We also cannot use $assume$ statement instead, since it may allow us to prove something, which we should not be able to prove. E.g. is we have $assert$ $false$ statement. 
+
+	\subsection{Havoc.}
+	
+	\begin{equation*}
+		[[x := havoc]]_I = x := havoc
+	\end{equation*}
+	
+	\begin{equation*}
+	\begin{multlined}
+		[[x := havoc]]_{I\_L}(targets) = x' := havoc \text{ ,} \\
+		\text{for $x' = M(\{x\})$ }
+	\end{multlined}
+	\end{equation*}
+
+	\subsection{Assignment.}
+	
+	\begin{equation*}
+		[[x:=e]]_{I} = x := e 
+	\end{equation*}
+	
+	\begin{equation*}
+	\begin{multlined}
+		[[x:=e]]_{I\_L}(targets) = x' := e[vars / targets] 
+		\text{ ,} \\
+		\text{for $x' = M(\{x\})$ 
+			and $vars$ such that $targets = M(vars)$}
+	\end{multlined}
+	\end{equation*}
+	
+	\subsection{Method Call.}
+	
+	\begin{equation*}
+		[[(x_1,...,x_m) := call \text{ } m(e_1,...,e_k)]]_I = (x_1,...,x_m) := call \text{ } m(e_1,...,e_k)
+	\end{equation*}
+	
+	\begin{equation*}
+	\begin{multlined}
+		[[(x_1,...,x_m) := 
+		call \text{ } m(e_1,...,e_k)]]_{I\_L}(targets) = \\  
+		(x_1',..., x_m') := 
+		call \text{ } m(e_1[vars / targets],...,e_k[vars / targets])
+		\text{ ,} \\
+		\text{for $\{x_1',...,x_m'\} = M(\{x_1,...,x_m\})$ 
+		and $vars$ such that $targets = M(vars)$}
+	\end{multlined}
+	\end{equation*}
+		
+	\subsection{While.}	
+	We first define the transformation function $[[\bullet]]_{N\_L}$, which takes IMP statements as arguments. For each statement, except the $while(e) \text{ } do\{s\}$, it is an identity transformation.
+	For $while(e) \text{ } do\{s\}$ it is defined as follows.
+	
+	% N_L
+	\begin{equation*}
+	\begin{multlined}
+		[[while(e) \text{ } do\{s\}]]_{N\_L} = \\
+		id := get\_id(while(e) \text{ } do\{s\}); \\
+		star\_id := havoc; \\
+		\odot_{x \in T(while(e) \text{ } do\{s\})}
+		x := havoc \text{ ;} \\
+		\odot^k_{i=1, inv_j \in I'} 
+		assume \text{ } on\_id_i ==> inv_i \text{ ;} \\
+		if(star\_id) \text{ } then \text{ } \\
+		\text{// we need this part 
+			because of possible assert statements,} \\
+		\text{// which were replaced by skip in the simulation} \\
+		assume \text{ } e \text{ ;} \\
+		[[s]]_{N\_L} \text{ ; } \\
+		assume \text{ } false \text{ ;}\\
+		\text{ } else \\
+		\text{ } assume \text{ } \lnot e \text{ ;} \\		
+		\\
+		\text{where $fresh(star\_id)$ and $(on\_id_1,...,on\_id_k)$
+			 should be declared earlier}		
+	\end{multlined}
+	\end{equation*}
+	\\
+	
+	% I_L
+	\vspace*{-3.5cm}
+	\begin{equation*}
+	\begin{multlined}
+		[[while(e) \text{ } do\{s\}]]_{I\_L}(targets) = \\
+		id := get\_id(while(e) \text{ } do\{s\}) \text{ ;} \\
+		\\
+		\text{// check, 
+			whether an invariant holds before the loop} \\
+		\odot^k_{i=1, inv_j \in I'} assume \text{ } 
+		inv_i[targets / M(targets)] <==> on\_b\_id_i \text{ ;} \\
+		\\
+		\text{// check the inner loop condition} \\
+		lc\_id := havoc \text{ ;} \\
+		assume \text{ } 
+		e[targets / M(targets)] <==> lc\_id \\
+		\\
+		\text{// simulate an arbitrary iteration} \\
+		\odot_{x' = M(x), x \in T(while(e) \text{ } do\{s\})}
+		x' := havoc \text{ ;} \\
+		\odot^k_{i=1, inv_j \in I'} 
+		assume \text{ } on\_a\_id_i ==> 
+		inv_i[targets / M(targets)] \text{ ;} \\
+		\text{// restrictions on invariant values 
+			due to invariants, which hold} \\
+		\odot^k_{i=1, inv_j \in I'} 
+		assume \text{ } on\_b\_id_i ==> 
+		inv_i[targets / M(targets)] \text{ ;} \\
+		\\
+		\text{// we only simulate the inner loop,
+			if we can ever enter it} \\
+		if(lc\_id) \text{ } then \\
+		assume \text{ } e[targets / M(targets)] \text{ ;} \\
+		\\
+		\text{// transformed loop body} \\
+		[[s]]_{I\_L}(targets) \text{ ;} \\
+		\\		
+		\text{// infer, which invariants hold} \\
+		\odot^k_{i=1, inv_j \in I'} 
+		assume \text{ }
+		(on\_b\_id_i \land 
+		(on\_a\_id_i ==> inv_i[targets / M(targets)])) 
+		==> on\_id_i \text{ ;} \\
+		\\
+		else \\
+		\text{// we still have to set inavriant flags} \\
+		\text{//in order to restrict the havoced variable
+			 values while verifying the original loop} \\
+		\odot^k_{i=1, inv_j \in I'}
+		on\_b\_id_i <==> on\_id_i \text{ ;} \\
+		\\
+		\text{// we are out of the loop here} \\
+		assume \text{ } \lnot e \text{ ;} \\
+		\\
+		\text{where $fresh(id)$, $fresh(lc\_id)$ and} \\ \text{$(on\_id_1,...,on\_id_k)$,
+			$(on\_b\_id_1,...,on\_b\_id_k)$ 
+			should be declared earlier} \\
+	\end{multlined}
+	\end{equation*}
+	
+	% I
+	\vspace*{-3.0cm}
+	\begin{equation*}
+	\hspace*{-1.7cm}
+	\begin{multlined}
+	[[while(e) \text{ } do\{s\}]]_I =
+	\text{// boolean variables to infer, 
+		whether an invariant holds} \\
+	\odot^k_{i=1} on_i := havoc \text{ ;} \\
+	\odot^k_{i=1} on\_b_i := havoc \text{ ;} \\
+	\odot^k_{i=1} on\_a_i := havoc \text{ ;} \\
+	\\
+	\text{// boolean variables to infer, 
+		which invariants hold in nested loops} \\
+	\odot_{id \in get\_nested\_id(while(e) \text{ } do\{s\})}
+	\odot^k_{i=1} on\_id_i := havoc \text{ ;} \\
+	\odot_{id \in get\_nested\_id(while(e) \text{ } do\{s\})}
+	\odot^k_{i=1} on\_b\_id_i := havoc \text{ ;} \\
+	\odot_{id \in get\_nested\_id(while(e) \text{ } do\{s\})}
+	\odot^k_{i=1} on\_a\_id_i := havoc \text{ ;} \\
+	\\
+	\text{// check, 
+		whether an invariant holds before the loop} \\
+	\text{ // no variable names replacement 
+		necessary here} \\
+	\odot^k_{i=1, inv_j \in I'} assume \text{ } inv_i <==> on\_b_i \text{ ;} \\
+	\\
+	\text{// simulate an arbitrary iteration} \\
+	\odot_{x' = M(x), x \in T(while(e) \text{ } do\{s\})}
+	x' := havoc \text{ ;} \\
+	\odot^k_{i=1, inv_j \in I'} 
+	assume \text{ } on\_a_i ==> 
+	inv_i[T(while(e) \text{ } do\{s\}) /
+	M(T(while(e) \text{ } do\{s\}))] \text{ ;} \\
+	\text{// restrictions on variable values
+		due to invariants, which hold} \\
+	\odot^k_{i=1, inv_j \in I'} 
+	assume \text{ } on\_b_i ==> 
+	inv_i[T(while(e) \text{ } do\{s\}) /
+	M(T(while(e) \text{ } do\{s\}))] 
+	\text{ ;} \\
+	\\
+	\text{// we only simulate the outer loop, if we can ever enter it} \\
+	\text{// we do not need the duplicates 
+		  in the if clause for the outer loop} \\
+	if(e) \text{ } then \\
+	assume \text{ } e[T(while(e) \text{ } do\{s\}) /
+	M(T(while(e) \text{ } do\{s\}))] \text{ ;} \\
+	\\
+	\text{// transformed loop body} \\
+	[[s]]_{I\_L}(T(while(e) \text{ } do\{s\})) \text{ ;} \\	
+	\\
+	\text{// infer, which invariants hold} \\
+	\odot^k_{i=1, inv_j \in I'} 
+	assume \text{ }
+	(on\_b_i \land (on\_a_i ==> 
+	inv_i[T(while(e) \text{ } do\{s\}) /
+	M(T(while(e) \text{ } do\{s\}))])) 
+	==> on_i \text{ ;} \\
+	\\
+	else \\
+	\text{// we still have to set inavriant flags} \\ 
+	\text{//in order to restrict the havoced variable
+		 values while verifying the original loop} \\
+	\odot^k_{i=1, inv_j \in I'} 
+	on\_b_i <==> inv_i \text{ ;} \\
+	\end{multlined}
+	\end{equation*}
+	
+	% I continued (actual loop)
+	\begin{equation*}
+	\begin{multlined}
+	\\
+	\text{// actual loop} \\
+	star := havoc; \\
+	\odot_{x \in T(while(e) \text{ } do\{s\})}
+	x := havoc \text{ ;} \\
+	\odot^k_{i=1, inv_j \in I'} 
+	assume \text{ } on_i ==> inv_i \text{ ;} \\
+	if(star) \text{ } then \text{ } \\
+	\text{// we need this part 
+		because of possible assert statements,} \\
+	\text{// which were replaced by skip in the simulation} \\
+	assume \text{ } e \text{ ;} \\
+	[[s]]_{N\_L} \text{ ; } \\
+	assume \text{ } false \text{ ;} \\
+	\text{ } else \text{ } \\
+	assume \text{ } \lnot e \text{ ;} \\		
+	\\
+	where \text{ } fresh(on_1,...,on_k) \land
+	fresh(on\_b_1,...,on\_b_k) \land 
+	fresh(on\_a_1,...,on\_a_k) \land \\
+	\land_{id \in get\_nested\_id(while(e) \text{ } do\{s\})}
+	fresh(on\_id_1,...,on\_id_k) \land \\
+	\land_{id \in get\_nested\_id(while(e) \text{ } do\{s\})}
+	fresh(on\_b\_id_1,...,on\_b\_id_k) \land \\
+	\land_{id \in get\_nested\_id(while(e) \text{ } do\{s\})}
+	fresh(on\_a\_id_1,...,on\_a\_id_k) \land \\
+	fresh(star) \\
+	\end{multlined}
+	\end{equation*}
+	
+\end{document}
